@@ -5,10 +5,11 @@ from mysql.connector import Error
 def create_connection():
     try:
         connection = mysql.connector.connect(
-            host=os.getenv('DB_HOST', 'localhost'),
-            user=os.getenv('DB_USER', 'root'),
-            password=os.getenv('DB_PASSWORD', '1025'),
-            database=os.getenv('DB_NAME', 'LabaRide_DB')
+            host=os.getenv('MYSQLHOST', 'localhost'),
+            user=os.getenv('MYSQLUSER', 'root'),
+            password=os.getenv('MYSQLPASSWORD', '1025'),
+            database=os.getenv('MYSQLDATABASE', 'LabaRide_DB')
+            port=os.getenv('MYSQLPORT', '8080')
         )
         if connection.is_connected():
             print("Successfully connected to MySQL database")
