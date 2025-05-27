@@ -1166,6 +1166,11 @@ def get_notifications(user_id):
 if __name__ == '__main__':
     try:
         print("Starting Flask-SocketIO server...")
-        socketio.run(app, debug=True, port=5000, allow_unsafe_werkzeug=True)
+        # For development
+        if app.debug:
+            socketio.run(app, debug=True, port=5000, allow_unsafe_werkzeug=True)
+        # For production
+        else:
+            socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
     except Exception as e:
         print(f"Error starting server: {e}")
