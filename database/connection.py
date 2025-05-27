@@ -8,8 +8,8 @@ def create_connection():
             host=os.getenv('MYSQLHOST', 'localhost'),
             user=os.getenv('MYSQLUSER', 'root'),
             password=os.getenv('MYSQLPASSWORD', '1025'),
-            database=os.getenv('MYSQLDATABASE', 'LabaRide_DB')
-            port=os.getenv('MYSQLPORT', '8080')
+            database=os.getenv('MYSQLDATABASE', 'LabaRide_DB'),
+            port=os.getenv('MYSQLPORT', '8080'),
         )
         if connection.is_connected():
             print("Successfully connected to MySQL database")
