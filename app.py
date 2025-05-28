@@ -342,6 +342,53 @@ def get_shop_by_id(shop_id):
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
+
+@app.route('/update_shop/<int:shop_id>', methods=['PUT'])
+@jwt_required
+def update_shop(shop_id):
+    connection = None
+    try:
+        data = request.json
+        connection = create_connection()
+        cursor = connection.cursor()
+        
+        query = """
+            UPDATE shops 
+            SET shop_name = %s,
+                contact_number = %s,
+                opening_time = %s,
+                closing_time = %s
+            WHERE id = %s
+        """
+        
+        values = (
+            data['shop_name'],
+            data['contact_number'],
+            data['opening_time'],
+            data['closing_time'],
+            shop_id
+        )
+        
+        cursor.execute(query, values)
+        connection.commit()
+        
+        if cursor.rowcount > 0:
+            return jsonify({
+                'message': 'Shop updated successfully',
+                'shop_id': shop_id
+            }), 200
+        else:
+            return jsonify({'message': 'No shop found with that ID'}), 404
+            
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"Error updating shop: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
             
 # Transaction Routes
 @app.route('/create_transaction/<int:user_id>', methods=['POST'])
