@@ -289,24 +289,55 @@ def get_recent_shops():
         connection = create_connection()
         cursor = connection.cursor(dictionary=True)
         
-        # Query to fetch the most recent shops
         query = """
-            SELECT id, shop_name, contact_number, zone, street, barangay, building, 
-                opening_time, closing_time, created_at
+            SELECT 
+                id, 
+                shop_name, 
+                contact_number, 
+                zone, 
+                street, 
+                barangay, 
+                building,
+                opening_time, 
+                closing_time, 
+                created_at,
+                latitude,
+                longitude,
+                address,
+                CONCAT(zone, ', ', street, ', ', barangay) as location
             FROM shops
+            WHERE latitude IS NOT NULL 
+            AND longitude IS NOT NULL
             ORDER BY created_at DESC
             LIMIT 10
         """
         cursor.execute(query)
         shops = cursor.fetchall()
         
-        return jsonify(shops), 200
+        # Format the response
+        formatted_shops = []
+        for shop in shops:
+            formatted_shop = {
+                'id': shop['id'],
+                'shop_name': shop['shop_name'],
+                'contact_number': shop['contact_number'],
+                'location': shop['location'],
+                'opening_time': shop['opening_time'],
+                'closing_time': shop['closing_time'],
+                'latitude': float(shop['latitude']) if shop['latitude'] else None,
+                'longitude': float(shop['longitude']) if shop['longitude'] else None,
+                'address': shop['address']
+            }
+            formatted_shops.append(formatted_shop)
+        
+        return jsonify(formatted_shops), 200
     except Exception as e:
+        print(f"Error fetching shops: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         if connection and connection.is_connected():
             cursor.close()
-            connection.close()       
+            connection.close()  
             
 @app.route('/shop/<int:shop_id>', methods=['GET'])
 @jwt_required
