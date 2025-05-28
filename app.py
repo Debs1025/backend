@@ -437,16 +437,23 @@ def get_user_transactions(user_id):
         cursor.execute(query, (user_id,))
         transactions = cursor.fetchall()
         
-        # Convert decimal values to strings for JSON serialization
+        # Convert decimal and datetime values to JSON-serializable format
+        formatted_transactions = []
         for transaction in transactions:
-            if 'total_amount' in transaction:
-                transaction['total_amount'] = str(transaction['total_amount'])
-            if 'created_at' in transaction:
-                transaction['created_at'] = transaction['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            formatted_transaction = {}
+            for key, value in transaction.items():
+                if isinstance(value, Decimal):
+                    formatted_transaction[key] = float(value)
+                elif isinstance(value, datetime):
+                    formatted_transaction[key] = value.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    formatted_transaction[key] = value
+            formatted_transactions.append(formatted_transaction)
         
-        return jsonify({'status': 'success', 'data': transactions}), 200
+        return jsonify({'status': 'success', 'data': formatted_transactions}), 200
         
     except Exception as e:
+        print(f"Error in get_user_transactions: {str(e)}")  # Debug print
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
         if connection and connection.is_connected():
