@@ -431,8 +431,25 @@ def get_user_transactions(user_id):
                 t.id,
                 t.status,
                 t.created_at,
+                t.service_name,
+                CAST(t.kilo_amount AS FLOAT) as kilo_amount,
+                CAST(t.subtotal AS FLOAT) as subtotal,
+                CAST(t.delivery_fee AS FLOAT) as delivery_fee,
+                CAST(t.voucher_discount AS FLOAT) as voucher_discount,
                 CAST(t.total_amount AS FLOAT) as total_amount,
-                s.shop_name
+                s.shop_name,
+                t.payment_method,
+                t.user_name,
+                t.user_email,
+                t.user_phone,
+                t.delivery_type,
+                t.zone,
+                t.street,
+                t.barangay,
+                t.building,
+                t.scheduled_date,
+                t.scheduled_time,
+                t.notes
             FROM transactions t
             JOIN shops s ON t.shop_id = s.id
             WHERE t.user_id = %s
@@ -441,13 +458,17 @@ def get_user_transactions(user_id):
         cursor.execute(query, (user_id,))
         transactions = cursor.fetchall()
         
-        # Format dates and decimals
+        # Format dates, times, and decimals
         formatted_transactions = []
         for transaction in transactions:
             formatted_transaction = {}
             for key, value in transaction.items():
                 if isinstance(value, datetime):
                     formatted_transaction[key] = value.strftime('%Y-%m-%d %H:%M:%S')
+                elif isinstance(value, timedelta):
+                    formatted_transaction[key] = str(value)
+                elif isinstance(value, Decimal):
+                    formatted_transaction[key] = float(value)
                 else:
                     formatted_transaction[key] = value
             formatted_transactions.append(formatted_transaction)
