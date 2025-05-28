@@ -428,7 +428,11 @@ def get_user_transactions(user_id):
         
         # Query to get user's transactions with shop details
         query = """
-            SELECT t.*, s.shop_name
+            SELECT 
+                t.*,
+                s.shop_name,
+                CAST(t.total_amount AS FLOAT) as total_amount,
+                DATE_FORMAT(t.created_at, '%Y-%m-%d %H:%M:%S') as created_at
             FROM transactions t
             JOIN shops s ON t.shop_id = s.id
             WHERE t.user_id = %s
@@ -437,24 +441,32 @@ def get_user_transactions(user_id):
         cursor.execute(query, (user_id,))
         transactions = cursor.fetchall()
         
-        # Convert decimal and datetime values to JSON-serializable format
+        # Format the transactions properly
         formatted_transactions = []
         for transaction in transactions:
             formatted_transaction = {}
             for key, value in transaction.items():
-                if isinstance(value, Decimal):
+                if isinstance(value, (datetime, timedelta)):
+                    formatted_transaction[key] = value.strftime('%Y-%m-%d %H:%M:%S') if isinstance(value, datetime) else str(value)
+                elif isinstance(value, Decimal):
                     formatted_transaction[key] = float(value)
-                elif isinstance(value, datetime):
-                    formatted_transaction[key] = value.strftime('%Y-%m-%d %H:%M:%S')
                 else:
                     formatted_transaction[key] = value
             formatted_transactions.append(formatted_transaction)
         
-        return jsonify({'status': 'success', 'data': formatted_transactions}), 200
+        print(f"Formatted transactions: {formatted_transactions}")  # Debug print
+        
+        return jsonify({
+            'status': 'success',
+            'data': formatted_transactions
+        }), 200
         
     except Exception as e:
         print(f"Error in get_user_transactions: {str(e)}")  # Debug print
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
     finally:
         if connection and connection.is_connected():
             cursor.close()
