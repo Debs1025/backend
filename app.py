@@ -153,7 +153,33 @@ def delete_account(user_id):
     result = user_controller.delete_account(user_id)
     return jsonify(result), result['status']
 
-
+@app.route('/get_user_by_id/<int:user_id>', methods=['GET'])
+def get_user_by_id(user_id):
+    connection = None
+    try:
+        connection = create_connection()
+        cursor = connection.cursor(dictionary=True)
+        
+        cursor.execute("""
+            SELECT id, email, name 
+            FROM users 
+            WHERE id = %s
+        """, (user_id,))
+        
+        user = cursor.fetchone()
+        
+        if user:
+            return jsonify(user), 200
+        return jsonify({'message': 'User not found'}), 404
+        
+    except Exception as e:
+        print(f"Error getting user: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+            
 # Shop Routes
 @app.route('/register_shop/<int:user_id>', methods=['POST'])
 @jwt_required
