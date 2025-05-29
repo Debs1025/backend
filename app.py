@@ -1320,6 +1320,164 @@ def get_notifications(user_id):
             cursor.close()
             connection.close()
 
+@app.route('/api/notifications/accept/<int:notification_id>', methods=['POST'])
+@jwt_required
+def accept_notification(notification_id):
+    connection = None
+    try:
+        connection = create_connection()
+        cursor = connection.cursor(dictionary=True)
+        # Get the related transaction_id
+        cursor.execute("SELECT transaction_id FROM notifications WHERE id = %s", (notification_id,))
+        notif = cursor.fetchone()
+        if notif and notif['transaction_id']:
+            cursor.execute(
+                "UPDATE transactions SET status = 'processing' WHERE id = %s",
+                (notif['transaction_id'],)
+            )
+        # Update notification status to accepted
+        cursor.execute(
+            "UPDATE notifications SET status = 'accepted', is_read = 1 WHERE id = %s",
+            (notification_id,)
+        )
+        connection.commit()
+        return jsonify({'message': 'Notification accepted'}), 200
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+
+@app.route('/api/notifications/decline/<int:notification_id>', methods=['POST'])
+@jwt_required
+def decline_notification(notification_id):
+    connection = None
+    try:
+        connection = create_connection()
+        cursor = connection.cursor(dictionary=True)
+        # Get the related transaction_id
+        cursor.execute("SELECT transaction_id FROM notifications WHERE id = %s", (notification_id,))
+        notif = cursor.fetchone()
+        if notif and notif['transaction_id']:
+            cursor.execute(
+                "UPDATE transactions SET status = 'cancelled' WHERE id = %s",
+                (notif['transaction_id'],)
+            )
+        # Update notification status to cancelled
+        cursor.execute(
+            "UPDATE notifications SET status = 'cancelled', is_read = 1 WHERE id = %s",
+            (notification_id,)
+        )
+        connection.commit()
+        return jsonify({'message': 'Notification declined'}), 200
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()       
+
+@app.route('/api/shops/<int:shop_id>/services/<service_name>', methods=['GET'])
+@jwt_required
+def get_service_price(shop_id, service_name):
+    connection = None
+    try:
+        connection = create_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT price FROM shop_services
+            WHERE shop_id = %s AND service_name = %s
+        """, (shop_id, service_name))
+        service = cursor.fetchone()
+        if service:
+            return jsonify({'price': float(service['price'])}), 200
+        else:
+            return jsonify({'price': 0}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+
+@app.route('/api/shops/<int:shop_id>/kilo_price', methods=['GET'])
+@jwt_required
+def get_kilo_price(shop_id):
+    kilo = float(request.args.get('kilo', 0))
+    connection = None
+    try:
+        connection = create_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT min_kilo, max_kilo, price_per_kilo
+            FROM kilo_prices
+            WHERE shop_id = %s AND %s BETWEEN min_kilo AND max_kilo
+            LIMIT 1
+        """, (shop_id, kilo))
+        row = cursor.fetchone()
+        if row:
+            return jsonify(row), 200
+        else:
+            return jsonify({'min_kilo': None, 'max_kilo': None, 'price_per_kilo': None}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+
+@app.route('/api/debug/transaction/<int:order_id>', methods=['GET'])
+def debug_transaction(order_id):
+    connection = None
+    try:
+        connection = create_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT price_per_kilo, kilo_amount, service_fee, subtotal, total_amount FROM transactions WHERE id = %s",
+            (order_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'error': 'Order not found'}), 404
+        return jsonify(row), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+
+@app.route('/api/orders/<int:order_id>/update_total', methods=['PUT'])
+def update_total(order_id):
+    connection = None
+    try:
+        data = request.get_json()
+        total_amount = data.get('total_amount')
+        if total_amount is None:
+            return jsonify({'error': 'Missing total_amount'}), 400
+
+        connection = create_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            "UPDATE transactions SET total_amount = %s WHERE id = %s",
+            (total_amount, order_id)
+        )
+        connection.commit()
+        return jsonify({'message': 'Total amount updated successfully'}), 200
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()  
+
 if __name__ == '__main__':
     try:
         print("Starting Flask-SocketIO server...")
