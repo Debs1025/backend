@@ -139,45 +139,13 @@ def update_user_details(user_id):
         return jsonify({'status': 500, 'message': str(e)}), 500
 
 @app.route('/update_password/<int:user_id>', methods=['PUT'])
-def update_password(user_id): 
-    connection = None
+@jwt_required
+def update_password(user_id):
     try:
-        data = request.json
-        connection = create_connection()
-        cursor = connection.cursor(dictionary=True)
-        
-        # First verify current password
-        cursor.execute("""
-            SELECT password FROM users 
-            WHERE id = %s
-        """, (user_id,))
-        
-        user = cursor.fetchone()
-        if not user:
-            return jsonify({'message': 'User not found'}), 404
-            
-        # Update password directly
-        cursor.execute("""
-            UPDATE users 
-            SET password = %s 
-            WHERE id = %s
-        """, (data['new_password'], user_id))
-        
-        connection.commit()
-        
-        return jsonify({
-            'message': 'Password updated successfully'
-        }), 200
-        
+        result = user_controller.update_password(user_id, request.json)
+        return jsonify(result), result['status']
     except Exception as e:
-        if connection:
-            connection.rollback()
-        print(f"Error updating password: {e}")
-        return jsonify({'error': str(e)}), 500
-    finally:
-        if connection and connection.is_connected():
-            cursor.close()
-            connection.close()
+        return jsonify({'status': 500, 'message': str(e)}), 500
 
 @app.route('/delete_account/<int:user_id>', methods=['DELETE'])
 @jwt_required
@@ -201,7 +169,7 @@ def get_user_by_id(user_id):
         user = cursor.fetchone()
         
         if user:
-            return jsonify(user), 200  # Add proper return
+            return jsonify(user), 200
         return jsonify({'message': 'User not found'}), 404
         
     except Exception as e:
@@ -211,7 +179,7 @@ def get_user_by_id(user_id):
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-            
+
 # Shop Routes
 @app.route('/register_shop/<int:user_id>', methods=['POST'])
 @jwt_required
