@@ -170,6 +170,63 @@ def get_user_by_id(user_id):
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
+
+@app.route('/update_password/<int:user_id>', methods=['PUT'])
+def update_password(user_id): 
+    connection = None
+    try:
+        data = request.json
+        connection = create_connection()
+        cursor = connection.cursor(dictionary=True)
+        
+        # First verify user exists
+        cursor.execute("""
+            SELECT id, password, email FROM users 
+            WHERE id = %s
+        """, (user_id,))
+        
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+            
+        # Get the existing salt from current password
+        current_password = user['password']
+        if current_password and current_password.count('$') >= 3:
+            # Extract salt part (everything up to the last $)
+            salt_parts = current_password.rsplit('$', 1)[0]
+            
+            # Create new hashed password using same salt format
+            from werkzeug.security import generate_password_hash
+            new_password = generate_password_hash(
+                data['new_password'],
+                method='pbkdf2:sha256',
+                salt_length=16
+            )
+
+            # Update password
+            cursor.execute("""
+                UPDATE users 
+                SET password = %s 
+                WHERE id = %s
+            """, (new_password, user_id))
+            
+            connection.commit()
+            
+            return jsonify({
+                'message': 'Password updated successfully'
+            }), 200
+        else:
+            return jsonify({'message': 'Invalid password format'}), 400
+        
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"Error updating password: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
             
 # Shop Routes
 @app.route('/register_shop/<int:user_id>', methods=['POST'])
