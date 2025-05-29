@@ -144,11 +144,11 @@ def update_password(user_id):
     try:
         data = request.json
         connection = create_connection()
-        cursor = connection.cursor()
+        cursor = connection.cursor(dictionary=True)
         
         # First verify current password
         cursor.execute("""
-            SELECT password FROM users 
+            SELECT id, password FROM users 
             WHERE id = %s
         """, (user_id,))
         
@@ -156,7 +156,6 @@ def update_password(user_id):
         if not user:
             return jsonify({'message': 'User not found'}), 404
             
-        # Update password
         cursor.execute("""
             UPDATE users 
             SET password = %s 
