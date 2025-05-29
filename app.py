@@ -138,15 +138,6 @@ def update_user_details(user_id):
     except Exception as e:
         return jsonify({'status': 500, 'message': str(e)}), 500
 
-@app.route('/update_password/<int:user_id>', methods=['PUT'])
-@jwt_required
-def update_password(user_id):
-    try:
-        result = user_controller.update_password(user_id, request.json)
-        return jsonify(result), result['status']
-    except Exception as e:
-        return jsonify({'status': 500, 'message': str(e)}), 500
-
 @app.route('/delete_account/<int:user_id>', methods=['DELETE'])
 @jwt_required
 def delete_account(user_id):
@@ -169,7 +160,7 @@ def get_user_by_id(user_id):
         user = cursor.fetchone()
         
         if user:
-            return jsonify(user), 200
+            return jsonify(user), 200  # Add proper return
         return jsonify({'message': 'User not found'}), 404
         
     except Exception as e:
@@ -179,7 +170,7 @@ def get_user_by_id(user_id):
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-
+            
 # Shop Routes
 @app.route('/register_shop/<int:user_id>', methods=['POST'])
 @jwt_required
