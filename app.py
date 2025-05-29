@@ -469,17 +469,21 @@ def update_shop(shop_id):
 @jwt_required
 def create_transaction(user_id):
     try:
-        result = transaction_controller.create_transaction(user_id, request.json)
+        data = request.json.copy()
+        # Convert list of services to comma-separated string
+        services = data.get('services', [])
+        data['service_name'] = ', '.join(services)
+        result = transaction_controller.create_transaction(user_id, data)
         if result['status'] == 201:
-            shop_id = request.json['shop_id']
+            shop_id = data['shop_id']
             transaction_data = {
                 'transaction_id': result['transaction_id'],
                 'user_id': user_id,
                 'shop_id': shop_id,
-                'service_name': request.json.get('service_name'),
-                'items': request.json.get('items', []),
+                'service_name': data.get('service_name'),
+                'items': data.get('items', []),
                 'status': 'Pending',
-                'total_amount': request.json['total_amount'],
+                'total_amount': data['total_amount'],
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
