@@ -19,7 +19,7 @@ class TransactionController:
                 return {'status': 404, 'message': 'User not found'}
 
             # Validate kilo amount if present
-            if 'kilo_amount' in data:
+            if 'kilo_amount' in data and float(data['kilo_amount']) > 0:
                 price_query = """
                     SELECT price_per_kilo 
                     FROM kilo_prices 
@@ -38,11 +38,14 @@ class TransactionController:
                 if not price_data:
                     return {'status': 400, 'message': 'Invalid kilo range'}
 
+            # Handle services as JSON array
+            services = json.dumps(data['services']) if isinstance(data['services'], list) else data['services']
+
             # Insert transaction
             query = """
                 INSERT INTO transactions (
                     user_id, shop_id, user_name, user_email, user_phone,
-                    service_name, kilo_amount, subtotal, delivery_fee,
+                    services, kilo_amount, subtotal, delivery_fee,
                     voucher_discount, total_amount, delivery_type,
                     zone, street, barangay, building,
                     scheduled_date, scheduled_time, payment_method,
@@ -60,11 +63,11 @@ class TransactionController:
                 user_data['name'],
                 user_data['email'],
                 user_data.get('phone', ''),
-                data['service_name'],
+                services,
                 data.get('kilo_amount', 0),
                 data['subtotal'],
                 data['delivery_fee'],
-                data['voucher_discount'],
+                data.get('voucher_discount', 0),
                 data['total_amount'],
                 data['delivery_type'],
                 data['zone'],
@@ -81,19 +84,20 @@ class TransactionController:
             transaction_id = cursor.lastrowid
             
             # Handle items insertion
-            if 'items' in data:
-                items_data = json.loads(data['items']) if isinstance(data['items'], str) else data['items']
+            if 'selected_items' in data and data['selected_items']:
+                items_data = json.loads(data['selected_items']) if isinstance(data['selected_items'], str) else data['selected_items']
                 items_query = """
                     INSERT INTO transaction_items (
                         transaction_id, item_name, quantity
                     ) VALUES (%s, %s, %s)
                 """
-                for item in items_data:
-                    cursor.execute(items_query, (
-                        transaction_id,
-                        item['name'],
-                        item['quantity']
-                    ))
+                for item_name, quantity in items_data.items():
+                    if quantity > 0:
+                        cursor.execute(items_query, (
+                            transaction_id,
+                            item_name,
+                            quantity
+                        ))
             
             conn.commit()
             return {
@@ -117,7 +121,6 @@ class TransactionController:
         try:
             cursor = conn.cursor(dictionary=True)
             
-            # Get transaction with items and kilo price
             query = """
                 SELECT t.*, k.price_per_kilo,
                     (SELECT JSON_ARRAYAGG(
@@ -142,6 +145,13 @@ class TransactionController:
             if not transaction:
                 return {'status': 404, 'message': 'Transaction not found'}
 
+            # Parse services from JSON if it exists
+            if transaction.get('services'):
+                try:
+                    transaction['services'] = json.loads(transaction['services'])
+                except:
+                    pass
+
             return {'status': 200, 'data': transaction}
 
         except Exception as e:
@@ -152,18 +162,71 @@ class TransactionController:
                 cursor.close()
                 conn.close()
 
-    def cancel_transaction(self, transaction_id, reason=None, notes=None):
+    def update_transaction_status(self, transaction_id, status, notes=None):
         conn = None
         try:
             conn = create_connection()
-            cursor = conn.cursor()
-            
-            # Check if transaction exists
-            cursor.execute("SELECT id, status FROM transactions WHERE id = %s", (transaction_id,))
+            cursor = conn.cursor(dictionary=True)
+
+            # Check if transaction exists and get user/shop IDs
+            cursor.execute("""
+                SELECT id, user_id, shop_id FROM transactions 
+                WHERE id = %s
+            """, (transaction_id,))
             transaction = cursor.fetchone()
             
             if not transaction:
                 return {'status': 404, 'message': 'Transaction not found'}
+
+            update_query = """
+                UPDATE transactions 
+                SET status = %s{}
+                WHERE id = %s
+            """.format(", notes = %s" if notes else "")
+
+            values = [status, transaction_id]
+            if notes:
+                values.insert(1, notes)
+
+            cursor.execute(update_query, tuple(values))
+            conn.commit()
+            
+            return {
+                'status': 200,
+                'message': 'Status updated successfully',
+                'user_id': transaction['user_id'],
+                'shop_id': transaction['shop_id']
+            }
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Error updating transaction status: {e}")
+            return {'status': 500, 'message': str(e)}
+        finally:
+            if conn and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    def cancel_transaction(self, transaction_id, reason=None, notes=None):
+        conn = None
+        try:
+            conn = create_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            # Check if transaction exists
+            cursor.execute("""
+                SELECT id, user_id, shop_id, status 
+                FROM transactions 
+                WHERE id = %s
+            """, (transaction_id,))
+            transaction = cursor.fetchone()
+            
+            if not transaction:
+                return {'status': 404, 'message': 'Transaction not found'}
+            
+            if transaction['status'] == 'Cancelled':
+                return {'status': 400, 'message': 'Transaction already cancelled'}
             
             # Update transaction status to Cancelled
             cursor.execute("""
@@ -179,7 +242,9 @@ class TransactionController:
             conn.commit()
             return {
                 'status': 200,
-                'message': 'Transaction cancelled successfully'
+                'message': 'Transaction cancelled successfully',
+                'user_id': transaction['user_id'],
+                'shop_id': transaction['shop_id']
             }
                 
         except Exception as e:
