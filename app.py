@@ -148,19 +148,24 @@ def update_password(user_id):
         
         # First verify current password
         cursor.execute("""
-            SELECT id, password FROM users 
+            SELECT password FROM users 
             WHERE id = %s
         """, (user_id,))
         
         user = cursor.fetchone()
         if not user:
             return jsonify({'message': 'User not found'}), 404
+
+        # Hash the new password before storing
+        from werkzeug.security import generate_password_hash
+        hashed_password = generate_password_hash(data['new_password'], method='pbkdf2:sha256')
             
+        # Update password with hashed value
         cursor.execute("""
             UPDATE users 
             SET password = %s 
             WHERE id = %s
-        """, (data['new_password'], user_id))
+        """, (hashed_password, user_id))
         
         connection.commit()
         
